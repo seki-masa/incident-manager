@@ -22,6 +22,7 @@ export default function HomePage() {
   const [hazards, setHazards] = useState<Hazard[]>([])
   const [selected, setSelected] = useState<Hazard | null>(null)
   const [formCoords, setFormCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [formPrefecture, setFormPrefecture] = useState<string | null>(null)
   const [notification, setNotification] = useState<string | null>(null)
 
   useEffect(() => {
@@ -63,8 +64,55 @@ export default function HomePage() {
 
   const handleMapClick = useCallback((lat: number, lng: number) => {
     setFormCoords({ lat, lng })
+    setFormPrefecture(null) // null = 取得中
     setSelected(null)
   }, [])
+
+  // formCoords が変わるたびにリバースジオコーディング
+  useEffect(() => {
+    if (!formCoords) {
+      setFormPrefecture(null)
+      return
+    }
+    const controller = new AbortController()
+    fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${formCoords.lat}&lon=${formCoords.lng}&accept-language=ja`,
+      { signal: controller.signal }
+    )
+      .then((r) => r.json())
+      .then((data) => {
+        const addr = data.address ?? {}
+
+        // 都道府県: addr.state が空の場合は display_name から「〜都/道/府/県」を抽出
+        // （東京23区など一部ロケーションで state が返らないケースに対応）
+        const state: string =
+          addr.state ||
+          (data.display_name as string | undefined)
+            ?.split(',')
+            .map((s: string) => s.trim())
+            .find((p: string) => /[都道府県]$/.test(p)) ||
+          ''
+
+        // 市・町・村・郡
+        const city: string =
+          addr.city ?? addr.municipality ?? addr.town ?? addr.village ?? addr.county ?? ''
+
+        // 区（東京23区は suburb に、政令指定都市は city_district に入る場合がある）
+        const ward: string = addr.city_district ?? addr.suburb ?? ''
+
+        const seen = new Set<string>()
+        const parts: string[] = []
+        for (const part of [state, city, ward]) {
+          if (part && !seen.has(part)) {
+            seen.add(part)
+            parts.push(part)
+          }
+        }
+        setFormPrefecture(parts.join(''))
+      })
+      .catch(() => setFormPrefecture('')) // エラー時は空文字（手動入力に任せる）
+    return () => controller.abort()
+  }, [formCoords])
 
   const handleFormSubmit = async (data: CreateHazardInput) => {
     const res = await fetch('/api/hazards', {
@@ -170,8 +218,9 @@ export default function HomePage() {
         <HazardForm
           lat={formCoords.lat}
           lng={formCoords.lng}
+          initialPrefecture={formPrefecture}
           onSubmit={handleFormSubmit}
-          onClose={() => setFormCoords(null)}
+          onClose={() => { setFormCoords(null); setFormPrefecture(null) }}
         />
       )}
     </div>
