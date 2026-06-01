@@ -1,0 +1,15 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./src:/app/src
+      - ./prisma:/app/prisma
+      - ./public:/app/public
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=file:./prisma/dev.db
+      - WATCHPACK_POLLING=true
+    command: >
+      sh -c "npx prisma generate && npx prisma db push && npm run dev"
