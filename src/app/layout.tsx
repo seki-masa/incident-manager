@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import 'leaflet/dist/leaflet.css'
 import './globals.css'
+import { Providers } from '@/components/Providers'
 
 export const metadata: Metadata = {
   title: '日本ハザードマネージャー',
@@ -15,7 +16,7 @@ export default function RootLayout({
   return (
     <html lang="ja">
       <body className="bg-gray-900 text-white h-screen overflow-hidden">
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   )
