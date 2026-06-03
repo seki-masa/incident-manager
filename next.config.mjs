@@ -14,16 +14,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "default-src 'self'",
-              // Next.js の HMR・React DevTools には unsafe-eval/unsafe-inline が必要
-              "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
-              // Leaflet などインラインスタイル使用
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://vercel.live",
               "style-src 'self' 'unsafe-inline'",
-              // OpenStreetMap タイル画像
               "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
-              // Nominatim API
-              "connect-src 'self' https://nominatim.openstreetmap.org",
+              "connect-src 'self' https://nominatim.openstreetmap.org https://vercel.live wss://ws-us3.pusher.com",
               "font-src 'self' data:",
-              "frame-src 'none'",
+              "frame-src https://vercel.live",
               "object-src 'none'",
             ].join('; '),
           },

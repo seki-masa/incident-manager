@@ -37,7 +37,8 @@ export default function HomePage() {
   useEffect(() => { selectedRef.current = selected }, [selected])
 
   const fetchHazards = useCallback(async () => {
-    const fresh: Hazard[] = await fetch('/api/hazards').then((r) => r.json())
+    const data = await fetch('/api/hazards').then((r) => r.json())
+    const fresh: Hazard[] = Array.isArray(data) ? data : []
     setHazards(fresh)
     // 編集中でなければ選択中ハザードも最新版に同期
     if (!isEditingRef.current && selectedRef.current) {
