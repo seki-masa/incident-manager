@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { signOut } from 'next-auth/react'
 import { Hazard } from '@/types/hazard'
 import { DangerBadge } from './DangerBadge'
 import { HAZARD_TYPE_LABELS, STATUS_LABELS } from '@/lib/hazardColors'
@@ -53,7 +54,15 @@ export function HazardHistory({ hazards, selectedId, onSelect, onDelete }: Props
   return (
     <aside className="w-80 bg-gray-800 border-r border-gray-700 flex flex-col h-full z-10 flex-shrink-0">
       <div className="p-4 border-b border-gray-700">
-        <h1 className="text-base font-bold">ハザード一覧</h1>
+        <div className="flex justify-between items-center">
+          <h1 className="text-base font-bold">ハザード一覧</h1>
+          <button
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="text-xs text-gray-500 hover:text-gray-300 transition-colors"
+          >
+            ログアウト
+          </button>
+        </div>
         <p className="text-xs text-gray-400 mt-0.5">{filtered.length} 件</p>
       </div>
 

@@ -1,4 +1,20 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: incident_manager
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     ports:
@@ -9,7 +25,19 @@ services:
       - ./public:/app/public
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=file:./prisma/dev.db
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/incident_manager
       - WATCHPACK_POLLING=true
+      # NextAuth（ローカル開発用。本番は Vercel 環境変数で上書きすること）
+      - NEXTAUTH_SECRET=local-dev-secret-change-in-production
+      - NEXTAUTH_URL=http://localhost:3000
+      # 管理者アカウント（ローカル開発用）
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin
+    depends_on:
+      postgres:
+        condition: service_healthy
     command: >
       sh -c "npx prisma generate && npx prisma db push && npm run dev"
+
+volumes:
+  postgres_data:

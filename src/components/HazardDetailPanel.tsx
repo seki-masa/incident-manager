@@ -8,11 +8,20 @@ import { HAZARD_TYPE_LABELS, STATUS_LABELS, DANGER_LABELS } from '@/lib/hazardCo
 interface Props {
   hazard: Hazard | null
   onClose: () => void
-  onUpdate: (id: string, data: object) => Promise<void>
+  onUpdate: (id: string, data: object, updatedAt?: string) => Promise<void>
   onStatusChange: (id: string, status: Hazard['status']) => void
+  onEditingChange?: (editing: boolean) => void
+  onConflict: (current: Hazard) => void
 }
 
-export function HazardDetailPanel({ hazard, onClose, onUpdate, onStatusChange }: Props) {
+export function HazardDetailPanel({
+  hazard,
+  onClose,
+  onUpdate,
+  onStatusChange,
+  onEditingChange,
+  onConflict,
+}: Props) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState({
     type: 'earthquake' as HazardType,
@@ -24,10 +33,17 @@ export function HazardDetailPanel({ hazard, onClose, onUpdate, onStatusChange }:
     occurredAt: '',
   })
   const [saving, setSaving] = useState(false)
+  const [conflictHazard, setConflictHazard] = useState<Hazard | null>(null)
 
   useEffect(() => {
     setEditing(false)
+    setConflictHazard(null)
   }, [hazard?.id])
+
+  const changeEditing = (v: boolean) => {
+    setEditing(v)
+    onEditingChange?.(v)
+  }
 
   const startEdit = () => {
     if (!hazard) return
@@ -40,22 +56,52 @@ export function HazardDetailPanel({ hazard, onClose, onUpdate, onStatusChange }:
       status: hazard.status as HazardStatus,
       occurredAt: new Date(hazard.occurredAt).toISOString().slice(0, 16),
     })
-    setEditing(true)
+    setConflictHazard(null)
+    changeEditing(true)
   }
+
+  const buildPayload = () => ({
+    ...form,
+    occurredAt: new Date(form.occurredAt).toISOString(),
+  })
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!hazard) return
     setSaving(true)
+    setConflictHazard(null)
     try {
-      await onUpdate(hazard.id, {
-        ...form,
-        occurredAt: new Date(form.occurredAt).toISOString(),
-      })
-      setEditing(false)
+      await onUpdate(hazard.id, buildPayload(), hazard.updatedAt)
+      changeEditing(false)
+    } catch (err: unknown) {
+      const e = err as { message?: string; current?: Hazard }
+      if (e.message === 'conflict' && e.current) {
+        setConflictHazard(e.current)
+      }
+      // 'deleted' は page.tsx 側の通知バナーで処理済みのため何もしない
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleForceSave = async () => {
+    if (!hazard) return
+    setSaving(true)
+    try {
+      // updatedAt を省略 → サーバー側は競合チェックをスキップ
+      await onUpdate(hazard.id, buildPayload())
+      changeEditing(false)
+      setConflictHazard(null)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSwitchToLatest = () => {
+    if (!conflictHazard) return
+    onConflict(conflictHazard)
+    changeEditing(false)
+    setConflictHazard(null)
   }
 
   if (!hazard) return null
@@ -86,6 +132,33 @@ export function HazardDetailPanel({ hazard, onClose, onUpdate, onStatusChange }:
 
       {editing ? (
         <form onSubmit={handleSave} className="p-4 space-y-3">
+          {/* 競合エラー通知 */}
+          {conflictHazard && (
+            <div className="p-3 bg-yellow-900/40 border border-yellow-700 rounded space-y-2">
+              <p className="text-yellow-300 text-xs font-medium">⚠ 他のユーザーが編集しました</p>
+              <p className="text-yellow-200/70 text-xs">
+                最終更新: {new Date(conflictHazard.updatedAt).toLocaleString('ja-JP')}
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleSwitchToLatest}
+                  className="flex-1 px-2 py-1 rounded border border-yellow-600 text-yellow-300 hover:bg-yellow-900/50 text-xs"
+                >
+                  最新版を確認
+                </button>
+                <button
+                  type="button"
+                  onClick={handleForceSave}
+                  disabled={saving}
+                  className="flex-1 px-2 py-1 rounded bg-red-700 hover:bg-red-600 text-white text-xs disabled:opacity-50"
+                >
+                  強制上書き保存
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="text-xs text-gray-400 block mb-1">種別</label>
             <select
@@ -175,7 +248,7 @@ export function HazardDetailPanel({ hazard, onClose, onUpdate, onStatusChange }:
           <div className="flex gap-2 pt-2">
             <button
               type="button"
-              onClick={() => setEditing(false)}
+              onClick={() => { changeEditing(false); setConflictHazard(null) }}
               className="flex-1 px-3 py-2 rounded text-sm border border-gray-600 text-gray-300 hover:bg-gray-700"
             >
               キャンセル

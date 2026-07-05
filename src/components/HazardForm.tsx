@@ -1,17 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { CreateHazardInput, HazardType, HazardStatus } from '@/types/hazard'
 import { HAZARD_TYPE_LABELS, DANGER_LABELS } from '@/lib/hazardColors'
 
 interface Props {
   lat: number
   lng: number
+  /** null = 取得中, '' = 取得失敗/海上, string = 住所 */
+  initialPrefecture?: string | null
   onSubmit: (data: CreateHazardInput) => Promise<void>
   onClose: () => void
 }
 
-export function HazardForm({ lat, lng, onSubmit, onClose }: Props) {
+export function HazardForm({ lat, lng, initialPrefecture, onSubmit, onClose }: Props) {
   const [form, setForm] = useState({
     type: 'earthquake' as HazardType,
     title: '',
@@ -22,6 +24,15 @@ export function HazardForm({ lat, lng, onSubmit, onClose }: Props) {
     occurredAt: new Date().toISOString().slice(0, 16),
   })
   const [loading, setLoading] = useState(false)
+
+  // 住所が取得できたら未入力の場合のみ自動入力
+  useEffect(() => {
+    if (typeof initialPrefecture === 'string' && initialPrefecture && !form.prefecture) {
+      setForm((prev) => ({ ...prev, prefecture: initialPrefecture }))
+    }
+  // form.prefecture を依存に含めると手動入力後に上書きされるため意図的に除外
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialPrefecture])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -60,9 +71,7 @@ export function HazardForm({ lat, lng, onSubmit, onClose }: Props) {
               onChange={(e) => setForm({ ...form, type: e.target.value as HazardType })}
             >
               {Object.entries(HAZARD_TYPE_LABELS).map(([v, l]) => (
-                <option key={v} value={v}>
-                  {l}
-                </option>
+                <option key={v} value={v}>{l}</option>
               ))}
             </select>
           </div>
@@ -95,22 +104,23 @@ export function HazardForm({ lat, lng, onSubmit, onClose }: Props) {
               <select
                 className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white"
                 value={form.dangerLevel}
-                onChange={(e) =>
-                  setForm({ ...form, dangerLevel: Number(e.target.value) })
-                }
+                onChange={(e) => setForm({ ...form, dangerLevel: Number(e.target.value) })}
               >
                 {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>
-                    Lv{n} {DANGER_LABELS[n]}
-                  </option>
+                  <option key={n} value={n}>Lv{n} {DANGER_LABELS[n]}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="text-xs text-gray-400 block mb-1">都道府県</label>
+              <label className="text-xs text-gray-400 block mb-1">
+                場所
+                {initialPrefecture === null && (
+                  <span className="ml-1 text-gray-500">（取得中...）</span>
+                )}
+              </label>
               <input
                 className="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-sm text-white"
-                placeholder="例: 東京都"
+                placeholder={initialPrefecture === null ? '取得中...' : '例: 東京都千代田区'}
                 value={form.prefecture}
                 onChange={(e) => setForm({ ...form, prefecture: e.target.value })}
               />
